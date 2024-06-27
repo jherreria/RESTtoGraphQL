@@ -12,6 +12,23 @@ export const resolvers = {
       }catch(err){
         throw new Error('Error getting contact: ' + err.message);
       } 
+    },
+    searchContacts: async (root, args) => {
+      try {
+        const searchTerm = args.query;
+        const regex = new RegExp(searchTerm, 'i'); // 'i' for case-insensitive search
+        const contacts = await Contacts.find({
+          $or: [
+            { firstName: { $regex: regex } },
+            { lastName: { $regex: regex } },
+            { email: { $regex: regex } },
+            { company: { $regex: regex } }
+          ]
+        });
+        return contacts;
+      } catch (err) {
+        throw new Error('Error searching contacts: ' + err.message);
+      }
     }
   },
   Mutation: {
@@ -45,17 +62,20 @@ export const resolvers = {
     updateContact: async (root, args) => {
       // console.log("\nupdateContact: ",args);
       try {
-        //Delta only appraoch
-        const updfields = {
-          id: args.update.id,
-          firstName: args.update?.firstName,
-          lastName: args.update?.lastName,
-          email: args.update?.email,
-          company: args.update?.company
+        //Delta appraoch
+        let updfields = await resolvers.Query.getContact("",{id:args.update.id});
+        let contacto = updfields.toObject();
+        contacto = {          
+          firstName: args.update?.firstName? args.update.firstName: contacto.firstName,
+          lastName: args.update?.lastName? args.update.lastName: contacto.lastName,
+          email: args.update?.email? args.update.email: contacto.email,
+          company: args.update?.company? args.update.company: contacto.company
         }
+
         // upsert: true -> insert if not found --- new:true return the updated doc
-        const contact = await Contacts.findOneAndUpdate({_id: args.id}, updfields, { upsert: true, new: true});
-        return contact;
+        const updatedContact = await Contacts.findOneAndUpdate({_id: args.id}, contacto, { upsert: true, new: true});
+        return updatedContact;
+        
       } catch (err) {
         throw new Error('Error updating contact: ' + err.message);
       }
